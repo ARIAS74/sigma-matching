@@ -621,24 +621,37 @@ def get_all_users():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
+    """Health check avec test de connexion base de données"""
     try:
-        # Test de la base de données avec SQLAlchemy 2.0
+        # Import SQLAlchemy text pour SQLA 2.x
         from sqlalchemy import text
-        db.session.execute(text('SELECT 1'))
+        
+        # Test de connexion à la base de données
+        with db.engine.connect() as connection:
+            result = connection.execute(text("SELECT 1 as health_check"))
+            db_status = "connected" if result.fetchone()[0] == 1 else "error"
+        
+        logger.info("Health check réussi - Base de données connectée")
         
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
             'version': '1.0.0',
-            'database': 'connected'
+            'database': db_status,
+            'components': {
+                'api': 'operational',
+                'database': db_status,
+                'auth': 'operational'
+            }
         })
         
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Health check failed: {str(e)}")
         return jsonify({
             'status': 'unhealthy',
             'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat(),
+            'database': 'disconnected'
         }), 500
 
 # ==================== FONCTIONS UTILITAIRES ====================
